@@ -28,8 +28,8 @@ struct to<JSON, T>
 {
     template <auto Opts, class B>
     GLZ_ALWAYS_INLINE static void op(auto&& value, is_context auto&& ctx, B&& b, auto&& ix) noexcept {
-        std::string str{value.toString().toStdString()};
-        write<Opts.format>::template op<Opts>(str, ctx, b, ix);
+        //std::string str{value.toString().toStdString()};
+        //write<Opts.format>::template op<Opts>(str, ctx, b, ix);
     }
 };
 
@@ -39,9 +39,9 @@ struct from<JSON, T> {
     template <glz::opts Opts, class... Args>
     GLZ_ALWAYS_INLINE static void op(auto& value, is_context auto&& ctx, Args&&... args) noexcept
     {
-        std::string str;
-        read<Opts.format>::template op<Opts>(str, ctx, args...);
-        value.fromString(QString::fromStdString(str));
+        //std::string str;
+        //read<Opts.format>::template op<Opts>(str, ctx, args...);
+        //value.fromString(QString::fromStdString(str));
     }
 };
 /*

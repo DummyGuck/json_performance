@@ -21,7 +21,7 @@
 #include "glaze/api/qt/qmap.hpp"
 #include "glaze/api/qt/qstring.hpp"
 #include "glaze/api/qt/quuid.hpp"
-#include "glaze/api/qt/qvariant.hpp"
+//#include "glaze/api/qt/qvariant.hpp"
 #include "glaze/api/tuplet.hpp"
 #include "glaze/api/type_support.hpp"
 #include "glaze/json/wrappers.hpp"

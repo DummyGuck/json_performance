@@ -1,6 +1,8 @@
 #include <string>
 #include <string_view>
 
+#include <QUuid>
+
 #include "glaze/glaze.hpp"
 #include "glaze/glaze_exceptions.hpp"
 
@@ -193,10 +195,10 @@ struct stdmap_stdstring_object
 struct flat_qstring_object
 {
     QString name0;
-    QString name1;
-    QString name2;
-    QString name3;
-    QString name4;
+    QUuid  name1;
+    QDateTime name2;
+    QTime name3;
+    QDate name4;
     QString name5;
     QString name6;
     QString name7;
@@ -284,6 +286,10 @@ struct flat_stdstring_object
     std::string name41;
     std::string name42;
     std::string name43;
+};
+
+struct flat_child_object : public flat_qstring_object {
+    QList<QString> asd;
 };
 
 template <>
@@ -429,46 +435,12 @@ struct glz::meta<flat_stdstring_object> {
         );
 };
 
-// for testing large, flat documents and out of sequence reading
-template <bool backward>
-struct abc_t
-{
-   std::vector<int64_t> a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
-   bool initialized = init();
-   
-   bool init() {
-      auto fill = [](auto& v) {
-         v.resize(1000);
-         std::iota(v.begin(), v.end(), 0);
-      };
-      
-      fill(a); fill(b); fill(c);
-      fill(d); fill(e); fill(f);
-      fill(g); fill(h); fill(i);
-      fill(j); fill(k); fill(l);
-      fill(m); fill(n); fill(o);
-      fill(p); fill(q); fill(r);
-      fill(s); fill(t); fill(u);
-      fill(v); fill(w); fill(x);
-      fill(y); fill(z);
-      return true;
-   }
-};
-
 template <>
-struct glz::meta<abc_t<false>>
-{
-   using T = abc_t<false>;
-   static constexpr auto value = object(&T::a,&T::b,&T::c,&T::d,&T::e,&T::f,&T::g,&T::h,&T::i,&T::j,&T::k,&T::l,&T::m,&T::n,
-                                        &T::o,&T::p,&T::q,&T::r,&T::s,&T::t,&T::u,&T::v,&T::w,&T::x,&T::y,&T::z);
-};
-
-template <>
-struct glz::meta<abc_t<true>>
-{
-   using T = abc_t<true>;
-   static constexpr auto value = object(&T::z,&T::y,&T::x,&T::w,&T::v,&T::u,&T::t,&T::s,&T::r,&T::q,&T::p,&T::o,&T::n,
-                                        &T::m,&T::l,&T::k,&T::j,&T::i,&T::h,&T::g,&T::f,&T::e,&T::d,&T::c,&T::b,&T::a);
+struct glz::meta<flat_child_object> {
+    using T = flat_child_object;
+    static constexpr auto value = object(
+        &T::asd
+        );
 };
 
 #ifdef NDEBUG
@@ -790,9 +762,12 @@ template <glz::opts Opts, class T>
 auto glaze_test_flat_string(const std::string& testName)
 {
     std::string buffer{ json_minified };
+    static constexpr auto partial = glz::json_ptrs("/name2", "/name3", "/name4");
+    auto date = QDate(1990, 1, 3);
+    auto time = QTime(13, 2, 4, 12);
 
-    T obj{"asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd"};
-
+    T obj{"asdasdasdasdawdawd", "asdasdasdasdawdawd", QDateTime(date, time), time, date, "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd"};
+    T obj2{};
     auto t0 = std::chrono::steady_clock::now();
 
     auto t1 = std::chrono::steady_clock::now();
@@ -801,7 +776,7 @@ auto glaze_test_flat_string(const std::string& testName)
     t0 = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < iterations; ++i) {
-        auto error = glz::write<Opts>(obj, buffer);
+        auto error = glz::write<partial, Opts>(static_cast<flat_qstring_object>(obj), buffer);
         if (error) {
             std::cout << "glaze error!" << error.custom_error_message << " \n";
             break;
@@ -821,7 +796,7 @@ auto glaze_test_flat_string(const std::string& testName)
     t0 = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < iterations; ++i) {
-        auto error = glz::read_json(obj, buffer);
+        auto error = glz::read_json(obj2, buffer);
         if (error) {
             std::cout << "glaze error!" << error.custom_error_message << " \n";
             break;
@@ -832,7 +807,7 @@ auto glaze_test_flat_string(const std::string& testName)
 
     r.json_read = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
 
-    //std::cout << buffer << "\n";
+    std::cout << buffer << "\n";
 
     r.print();
 
@@ -851,11 +826,12 @@ void test0()
 {
    std::vector<results> results;
    //results.emplace_back(glaze_test<glz::opts{}, qmap_qstring_object>("QMap<QString, QString>"));
-   results.emplace_back(glaze_test_qmap_variant<glz::opts{}, qmap_qvariant_object>("QMap<QString, QVariant>"));
-   results.emplace_back(glaze_test_qmap_variant<glz::opts{}, qmap_stdvariant_object>("QMap<QString, stdvariant>"));
+   //results.emplace_back(glaze_test_qmap_variant<glz::opts{}, qmap_qvariant_object>("QMap<QString, QVariant>"));
+   //results.emplace_back(glaze_test_qmap_variant<glz::opts{}, qmap_stdvariant_object>("QMap<QString, stdvariant>"));
    //results.emplace_back(glaze_test<glz::opts{}, qmap_stdstring_object>("QMap<std::string, std::string>"));
    //results.emplace_back(glaze_test<glz::opts{}, stdmap_stdstring_object>("std::map<std::string, std::string>"));
-   //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_qstring_object>("flat_qstring_object"));
+   results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_qstring_object>("flat_qstring_object"));
+   //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_child_object>("flat_child_object"));
    //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_stdstring_object>("flat_stdstring_object"));
    
    std::ofstream table{ "json_minfied_stats.md" };
