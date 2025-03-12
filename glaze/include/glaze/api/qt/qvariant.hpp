@@ -6,6 +6,7 @@
 #include <QVariant>
 #include <QDataStream>
 #include <QDebug>
+#include <QBuffer>
 
 #include <glaze/core/common.hpp>
 #include <glaze/json/read.hpp>
@@ -33,44 +34,10 @@ template <qvariantType T>
 struct to<JSON, T>
 {
     template <auto Opts, class VariantType>
-    static void tojson(VariantType&& val, QVariant::Type type, is_context auto&& ctx, auto&& b, auto&& ix) {
-        using V = std::decay_t<decltype(val)>;
-
-        //if constexpr (Opts.write_type_info && not tag_v<T>.empty() && glaze_object_t<V>) {
-
-            // must first write out type
-            if constexpr (Opts.prettify) {
-                dump<"{\n">(b, ix);
-                ctx.indentation_level += Opts.indentation_width;
-                dumpn<Opts.indentation_char>(ctx.indentation_level, b, ix);
-                dump<'"'>(b, ix);
-                dump("type", b, ix);
-                dump<"\": \"">(b, ix);
-                dump(static_cast<int>(type), b, ix);
-                if(not tag_v<T>.empty() && glaze_object_t<V>){
-                    constexpr auto N = reflect<V>::size;
-                    if constexpr (N == 0) {
-                        dump<"\"\n">(b, ix);
-                    }
-                    else {
-                        dump<"\",\n">(b, ix);
-                    }
-                }
-                else {
-                    dump<"\"\n">(b, ix);
-                }
-                dumpn<Opts.indentation_char>(ctx.indentation_level, b, ix);
-            }
-            else {
-                dump(std::to_string(static_cast<int>(type)), b, ix);
-                dump<'@'>(b, ix);
-            }
-            to<JSON, V>::template op<opening_handled<Opts>()>(val, ctx, b, ix);
-            dump<'}'>(b, ix);
-        //}
-        //else {
-        //    to<JSON, V>::template op<Opts>(val, ctx, b, ix);
-        //}
+    static void tojson(VariantType&& val, int type, is_context auto&& ctx, auto&& b, auto&& ix) {
+        dump(std::to_string(static_cast<int>(type)), b, ix);
+        dump<'@'>(b, ix);
+        to<JSON, VariantType>::template op<opening_handled<Opts>()>(val, ctx, b, ix);
     }
 
     template <auto Opts, class... Args>
@@ -95,11 +62,6 @@ struct to<JSON, T>
         case QVariant::String:
             tojson<Opts, QString>(value.template value<QString>(), QVariant::String, ctx, b, ix);
             break;
-            /*
-        case QVariant::ByteArray:
-            tojson<Opts, QByteArray>(value.template value<QByteArray>(), QVariant::ByteArray, ctx, b, ix);
-            break;
-*/
         case QVariant::Date:
             tojson<Opts, QDate>(value.template value<QDate>(), QVariant::Date, ctx, b, ix);
             break;
@@ -112,6 +74,12 @@ struct to<JSON, T>
         case QVariant::Uuid:
             tojson<Opts, QUuid>(value.template value<QUuid>(), QVariant::Uuid, ctx, b, ix);
             break;
+        case QVariant::UserType: {
+            dump(std::to_string(static_cast<int>(value.userType())), b, ix);
+            dump<'@'>(b, ix);
+            dump(std::move(value.template value<std::string>()), b, ix);
+            break;
+        }
         default:
             qDebug() << "Invalid or not supported QVariant type: " << value.type();
             break;
@@ -122,15 +90,6 @@ struct to<JSON, T>
 template <class T>
     requires qvariantType<T>
 struct from<JSON, T> {
-    /*
-    template <glz::opts Opts, class... Args>
-    GLZ_ALWAYS_INLINE static void op(auto& value, is_context auto&& ctx, Args&&... args) noexcept
-    {
-        QString str;
-        read<Opts.format>::template op<Opts>(&str, ctx, args...);
-        value = QVariant::fromValue(str);
-    }
-*/
     template <auto Opts, class... Args>
     static void fromjson(int type_info, auto&& value, is_context auto&& ctx, auto&& it, auto&& end)
     {
@@ -171,11 +130,6 @@ struct from<JSON, T> {
             value = val;
             break;
         }
-            /*
-        case QVariant::ByteArray:
-            tojson<Opts, QByteArray>(value.template value<QByteArray>(), QVariant::ByteArray, ctx, b, ix);
-            break;
-*/
         case QVariant::Date: {
             QDate val;
             from<JSON, QDate>::template op<Opts>(val, ctx, it, end);
@@ -200,9 +154,38 @@ struct from<JSON, T> {
             value = val;
             break;
         }
-        default:
-            ctx.error = error_code::no_matching_variant_type;
-            break;
+        default:{
+            auto start = it;
+            GLZ_MATCH_OPEN_BRACE;
+            if(ctx.error != error_code::expected_brace) {
+                ctx.error = error_code::syntax_error;
+            }
+            int openBraces = 1;
+            bool escaped = false;
+            while(openBraces != 0) {
+                if(it == end) {
+                    ctx.error = error_code::syntax_error;
+                    return;
+                }
+                if(!escaped && *it == '\\') {
+                    escaped = true;
+                }
+                else {
+                    if(!escaped && *it == '{')
+                        ++openBraces;
+                    if(!escaped && *it == '}')
+                        --openBraces;
+                    escaped = false;
+                }
+                ++it;
+            }
+            ctx.error = error_code::none;
+            value.setValue(std::string{start, it});
+            if(!value.convert(type_info)) {
+                ctx.error = error_code::no_matching_variant_type;
+                break;
+            }
+        }
         }
     }
 
@@ -231,8 +214,6 @@ struct from<JSON, T> {
         GLZ_SKIP_WS();
         auto start = it;
         fromjson<Opts>(type_info, value, ctx, it, end);
-        //handling closing '}'
-        ++it;
     }
 };
 /*

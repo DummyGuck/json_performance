@@ -5,6 +5,9 @@
 
 #include "glaze/glaze.hpp"
 #include "glaze/glaze_exceptions.hpp"
+#include "test.h"
+
+#include "glaze/api/qt/qvariant.hpp"
 
 /*
 [[maybe_unused]] constexpr std::string_view json_whitespace = R"(
@@ -59,15 +62,6 @@ struct fixed_object_t
    std::vector<double> double_array;
 };
 
-struct fixed_name_object_t
-{
-   std::string name0{};
-   std::string name1{};
-   std::string name2{};
-   std::string name3{};
-   std::string name4{};
-};
-
 struct nested_object_t
 {
    std::vector<std::array<double, 3>> v3s{};
@@ -102,18 +96,6 @@ struct glz::meta<fixed_object_t> {
       &T::int_array,
       &T::float_array,
       &T::double_array
-   );
-};
-
-template <>
-struct glz::meta<fixed_name_object_t> {
-   using T = fixed_name_object_t;
-   static constexpr auto value = object(
-      &T::name0,
-      &T::name1,
-      &T::name2,
-      &T::name3,
-      &T::name4
    );
 };
 
@@ -165,10 +147,9 @@ struct qmap_stdvariant_object
 {
     qmap_stdvariant_object() = default;
     qmap_stdvariant_object(qmap_stdvariant_object&) = default;
-    qmap_stdvariant_object(QMap<QString, std::variant<int, double>> map) : map(map) {}
-    QMap<QString, std::variant<int, double>> map;
+    qmap_stdvariant_object(QMap<QString, std::variant<QString, double>> map) : map(map) {}
+    QMap<QString, std::variant<QString, double>> map;
 };
-
 
 struct qmap_qvariant_object
 {
@@ -195,10 +176,10 @@ struct stdmap_stdstring_object
 struct flat_qstring_object
 {
     QString name0;
-    QUuid  name1;
-    QDateTime name2;
-    QTime name3;
-    QDate name4;
+    QString  name1;
+    QString name2;
+    QString name3;
+    QString name4;
     QString name5;
     QString name6;
     QString name7;
@@ -460,27 +441,27 @@ struct results
    std::string_view name{};
    std::string_view url{};
    size_t iterations{};
-   
+
    std::optional<size_t> json_byte_length{};
    std::optional<double> json_read{};
    std::optional<double> json_write{};
    std::optional<double> json_roundtrip{};
-   
+
    std::optional<size_t> binary_byte_length{};
    std::optional<double> binary_write{};
    std::optional<double> binary_read{};
    std::optional<double> binary_roundtrip{};
-   
+
    void print(bool use_minified = true)
    {
       if (json_roundtrip) {
          std::cout << name << " json roundtrip: " << *json_roundtrip << " s\n";
       }
-      
+
       if (json_byte_length) {
          std::cout << name << " json byte length: " << *json_byte_length << '\n';
       }
-      
+
       if (json_write) {
          if (json_byte_length) {
             const auto byte_length = use_minified ? minified_byte_length : *json_byte_length;
@@ -491,7 +472,7 @@ struct results
             std::cout << name << " json write: " << *json_write << " s\n";
          }
       }
-      
+
       if (json_read) {
          if (json_byte_length) {
             const auto byte_length = use_minified ? minified_byte_length : *json_byte_length;
@@ -502,16 +483,16 @@ struct results
             std::cout << name << " json read: " << *json_read << " s\n";
          }
       }
-      
+
       if (binary_roundtrip) {
          std::cout << '\n';
          std::cout << name << " binary roundtrip: " << *binary_roundtrip << " s\n";
       }
-      
+
       if (binary_byte_length) {
          std::cout << name << " binary byte length: " << *binary_byte_length << '\n';
       }
-      
+
       if (binary_write) {
          if (binary_byte_length) {
             const auto MBs = iterations * *binary_byte_length / (*binary_write * 1048576);
@@ -521,7 +502,7 @@ struct results
             std::cout << name << " binary write: " << *binary_write << " s\n";
          }
       }
-      
+
       if (binary_read) {
          if (binary_byte_length) {
             const auto MBs = iterations * *binary_byte_length / (*binary_read * 1048576);
@@ -531,10 +512,10 @@ struct results
             std::cout << name << " binary read: " << *binary_read << " s\n";
          }
       }
-      
+
       std::cout << "\n---\n" << std::endl;
    }
-   
+
    std::string json_stats(bool use_minified = true) const {
       static constexpr std::string_view s = R"(| [**{}**]({}) | **{}** | **{}** | **{}** |)";
       const std::string roundtrip = json_roundtrip ? std::format("{:.2f}", *json_roundtrip) : "N/A";
@@ -550,7 +531,7 @@ struct results
          return std::format(s, name, url, roundtrip, write, read);
       }
    }
-   
+
    std::string json_stats_read(bool use_minified = true) const {
       static constexpr std::string_view s = R"(| [**{}**]({}) | **{}** |)";
       if (json_byte_length) {
@@ -568,21 +549,21 @@ struct results
 template <class T>
 inline bool is_valid_write(const std::string& buffer, const std::string& library_name) {
    T obj{};
-   
+
    glz::ex::read_json(obj, json_minified);
-   
+
    std::string reference = glz::write_json(obj).value();
-   
+
    obj = {};
    glz::ex::read_json(obj, buffer);
-   
+
    std::string compare = glz::write_json(obj).value();
-   
+
    if (reference != compare) {
       std::cout << "Invalid write for library: " << library_name << std::endl;
       return false;
    }
-   
+
    return true;
 }
 
@@ -615,7 +596,7 @@ auto glaze_test(const std::string& testName)
    // write performance
    results r{testName, "https://github.com/stephenberry/glaze", iterations };
    t0 = std::chrono::steady_clock::now();
-   
+
    for (size_t i = 0; i < iterations; ++i) {
        auto error = glz::write<Opts>(obj, buffer);
       if (error) {
@@ -623,19 +604,19 @@ auto glaze_test(const std::string& testName)
          break;
       }
    }
-   
+
    t1 = std::chrono::steady_clock::now();
-   
+
    r.json_byte_length = buffer.size();
    minified_byte_length = *r.json_byte_length;
    r.json_write = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
-   
+
    //is_valid_write<T>(buffer, "Glaze");
-   
+
    // read performance
-   
+
    t0 = std::chrono::steady_clock::now();
-   
+
    for (size_t i = 0; i < iterations; ++i) {
        auto error = glz::read_json(obj, buffer);
       if (error) {
@@ -643,11 +624,11 @@ auto glaze_test(const std::string& testName)
          break;
       }
    }
-   
+
    t1 = std::chrono::steady_clock::now();
-   
+
    r.json_read = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
-   
+
    // binary write performance
 
    /*
@@ -658,31 +639,31 @@ auto glaze_test(const std::string& testName)
          break;
       }
    }
-   
+
    t1 = std::chrono::steady_clock::now();
-   
+
    r.binary_byte_length = buffer.size();
    r.binary_write = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
-   
+
    // binary read performance
-   
+
    t0 = std::chrono::steady_clock::now();
-   
+
    for (size_t i = 0; i < iterations; ++i) {
       if (glz::read_beve(obj, buffer)) {
          std::cout << "glaze error!\n";
          break;
       }
    }
-   
+
    t1 = std::chrono::steady_clock::now();
-   
+
    r.binary_read = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
-   
+
    // binary round trip
-   
+
    t0 = std::chrono::steady_clock::now();
-   
+
    for (size_t i = 0; i < iterations; ++i) {
       if (glz::read_beve(obj, buffer)) {
          std::cout << "glaze error!\n";
@@ -693,15 +674,15 @@ auto glaze_test(const std::string& testName)
          break;
       }
    }
-   
+
    t1 = std::chrono::steady_clock::now();
-   
+
    r.binary_roundtrip = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
 */
    //std::cout << buffer << "\n";
-   
+
    r.print();
-   
+
    return r;
 }
 
@@ -710,7 +691,13 @@ auto glaze_test_qmap_variant(const std::string& testName)
 {
     std::string buffer{ json_minified };
 
-    T obj{{{"Name", int(12345678912345)}, {"Name1", int(12345678912345)}, {"Name2", int(12345678912345)}, {"Name3", int(12345678912345)}, {"Name4", int(12345678912345)}, {"Name5", int(12345678912345)}, {"Name6", int(12345678912345)}, {"Name7", int(12345678912345)}, {"Name8", int(12345678912345)}, {"Name9", int(12345678912345)}, {"Name10", int(12345678912345)}, {"Name11", int(12345678912345)},{"Name12", int(12345678912345)}, {"Name13", int(12345678912345)}, {"Name14", int(12345678912345)}, {"Name15", int(12345678912345)}, {"Name16", int(12345678912345)}, {"Name17", int(12345678912345)}, {"Name18", int(12345678912345)}, {"Name19", int(12345678912345)}, {"Name20", int(12345678912345)}, {"Name21", int(12345678912345)}, {"Name22", int(12345678912345)}, {"Name23", int(12345678912345)}, {"Name24", int(12345678912345)}, {"Name25", int(12345678912345)}, {"Name26", int(12345678912345)}, {"Name27", int(12345678912345)}, {"Name28", int(12345678912345)}, {"Name29", int(12345678912345)}, {"Name30", int(12345678912345)}, {"Name31", int(12345678912345)}, {"Name32", int(12345678912345)}, {"Name33", int(12345678912345)}, {"Name34", int(12345678912345)},{"Name35", int(12345678912345)}, {"Name36", int(12345678912345)}, {"Name37", int(12345678912345)}, {"Name38", int(12345678912345)}, {"Name39", int(12345678912345)}, {"Name40", int(12345678912345)}, {"Name41", int(12345678912345)}, {"Name42", int(12345678912345)}, {"Name43", int(12345678912345)}, {"Name44", int(12345678912345)}, {"Name45", int(12345678912345)}}};
+    QVariant a;
+    a.setValue(fixed_name_object_t{"asdasd", "asdasd"});
+    //a.setValue(QString{"{\"name0\":\"asdasd\",\"name1\":\"asdasd\"}"});
+    QVariant b;
+    b.setValue(QString("asdfghjkléáűqwertzuiopőú"));
+
+    T obj{{{"Name", b}, {"Name1", b}, {"Name2", b}, {"Name3", b}, {"Name4", b}, {"Name5", b}, {"Name6", b}, {"Name7", b}, {"Name8", b}, {"Name9", b}, {"Name10", b}, {"Name11", b},{"Name12", b}, {"Name13", b}, {"Name14", b}, {"Name15", b}, {"Name16", b}, {"Name17", b}, {"Name18", b}, {"Name19", b}, {"Name20", b}, {"Name21", b}, {"Name22", b}, {"Name23", b}, {"Name24", b}, {"Name25", b}, {"Name26", b}, {"Name27", b}, {"Name28", b}, {"Name29", b}, {"Name30", b}, {"Name31", b}, {"Name32", b}, {"Name33", b}, {"Name34", b},{"Name35", b}, {"Name36", b}, {"Name37", b}, {"Name38", b}, {"Name39", b}, {"Name40", b}, {"Name41", b}, {"Name42", b}, {"Name43", b}, {"Name44", b}, {"Name45", b}}};
 
     auto t0 = std::chrono::steady_clock::now();
 
@@ -752,6 +739,8 @@ auto glaze_test_qmap_variant(const std::string& testName)
     r.json_read = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() * 1e-6;
 
     std::cout << buffer << "\n";
+    std::cout << obj.map["Name"].toInt() << "\n";
+    std::cout << obj.map["Name1"].toString().toStdString();
 
     r.print();
 
@@ -762,11 +751,12 @@ template <glz::opts Opts, class T>
 auto glaze_test_flat_string(const std::string& testName)
 {
     std::string buffer{ json_minified };
-    static constexpr auto partial = glz::json_ptrs("/name2", "/name3", "/name4");
+    //static constexpr auto partial = glz::json_ptrs("/name2", "/name3", "/name4");
     auto date = QDate(1990, 1, 3);
     auto time = QTime(13, 2, 4, 12);
 
-    T obj{"asdasdasdasdawdawd", "asdasdasdasdawdawd", QDateTime(date, time), time, date, "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd"};
+    T obj{"asdfghjklé", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd", "asdasdasdasdawdawd"};
+    //T obj{"asdasdasdasdawdawd"};
     T obj2{};
     auto t0 = std::chrono::steady_clock::now();
 
@@ -776,7 +766,7 @@ auto glaze_test_flat_string(const std::string& testName)
     t0 = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < iterations; ++i) {
-        auto error = glz::write<partial, Opts>(static_cast<flat_qstring_object>(obj), buffer);
+        auto error = glz::write<Opts>(obj, buffer);
         if (error) {
             std::cout << "glaze error!" << error.custom_error_message << " \n";
             break;
@@ -830,10 +820,22 @@ void test0()
    //results.emplace_back(glaze_test_qmap_variant<glz::opts{}, qmap_stdvariant_object>("QMap<QString, stdvariant>"));
    //results.emplace_back(glaze_test<glz::opts{}, qmap_stdstring_object>("QMap<std::string, std::string>"));
    //results.emplace_back(glaze_test<glz::opts{}, stdmap_stdstring_object>("std::map<std::string, std::string>"));
-   results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_qstring_object>("flat_qstring_object"));
+   //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_qstring_object>("flat_qstring_object"));
    //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_child_object>("flat_child_object"));
    //results.emplace_back(glaze_test_flat_string<glz::opts{}, flat_stdstring_object>("flat_stdstring_object"));
-   
+
+    {
+       std::string asd{"asd"};
+       std::cout << asd;
+       std::cout << asd.length();
+       asd.push_back('\0');
+       asd.push_back('\0');
+       asd.push_back('f');
+       std::cout << asd;
+       std::cout << asd.length();
+       asd.resize(20);
+    }
+
    std::ofstream table{ "json_minfied_stats.md" };
    if (table) {
       const auto n = results.size();
@@ -847,8 +849,33 @@ void test0()
    }
 }
 
+
+
+
+std::string serializeObj(fixed_name_object_t obj) {
+    std::string buffer{};
+    if(glz::write<glz::opts{}>(obj, buffer).ec != glz::error_code::none) {
+        std::cout << "fixed_name_object_t serialize failed";
+    }
+    return buffer;
+}
+
+fixed_name_object_t deserializeObj(std::string json) {
+    fixed_name_object_t obj{};
+    std::string buffer{std::move(json)};
+    if(glz::read_json(obj, buffer) != glz::error_code::none) {
+        std::cout << "fixed_name_object_t deserialize failed";
+    }
+    return obj;
+}
+
+
 int main()
 {
+   qRegisterMetaType<fixed_name_object_t>();
+   qRegisterMetaType<std::string>();
+   QMetaType::registerConverter<fixed_name_object_t, std::string>( serializeObj );
+   QMetaType::registerConverter<std::string, fixed_name_object_t>( deserializeObj );
    test0();
    return 0;
 }

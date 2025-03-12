@@ -5,11 +5,18 @@
 
 #include <QString>
 #include <QStringView>
+#include <QByteArray>
 
 #include <glaze/core/common.hpp>
 
 template<typename T>
 concept qstring_type = std::same_as<T, QString>;
+
+template<typename T>
+concept qbytearray_type = std::same_as<T, QByteArray>;
+
+template<typename T>
+concept stdstring_convertable = qstring_type<T> || qbytearray_type<T>;
 
 template <qstring_type T>
 struct glz::meta<T>
@@ -26,8 +33,18 @@ struct to<JSON, T>
 {
     template <auto Opts, class B>
     GLZ_ALWAYS_INLINE static void op(auto&& value, is_context auto&& ctx, B&& b, auto&& ix) noexcept {
-        //std::string str{std::move()};
-        write<Opts.format>::template op<Opts>(std::move(value.toStdString()), ctx, b, ix);
+        if(Opts.prettify) {
+            write<Opts.format>::template op<Opts>(value, ctx, b, ix);
+        }
+        else {
+            auto n = 2 * value.size();
+            std::memcpy(&b[ix], "\"", 1);
+            ++ix;
+            std::memcpy(&b[ix], value.constData(), n);
+            ix += n;
+            std::memcpy(&b[ix], "\"", 1);
+            ++ix;
+        }
     }
 };
 
@@ -36,11 +53,54 @@ struct from<JSON, T> {
     template <auto Opts, class It, class End>
     static void op(auto& value, is_context auto&& ctx, It&& it, End&& end)
     {
-        std::string str{};
-        read<Opts.format>::template op<Opts>(str, ctx, it, end);
-        value = QString::fromStdString(str);
+        if(Opts.prettify) {
+            std::string str{};
+            read<Opts.format>::template op<Opts>(str, ctx, it, end);
+            value = QString::fromStdString(str);
+        }
+        else {
+            GLZ_MATCH_QUOTE;
+            if(ctx.error == error_code::expected_quote) {
+                ctx.error = error_code::syntax_error;
+                return;
+            }
+            auto start = it;
+            bool strEnd = false;
+            bool escaped = false;
+            int size = 0;
+            while(true) {
+                if(it > end) {
+                    ctx.error = error_code::syntax_error;
+                    return;
+                }
+                if(!escaped && *it == '\\') {
+                    escaped = true;
+                }
+                if(!escaped && *it == '\"') {
+                    strEnd = true;
+                    break;
+                }
+                it += 2;
+                ++size;
+            }
+            ++it;
+            value.resize(size);
+            std::memcpy(value.data(), start, 2 * size);
+        }
     }
 };
+/*
+template <qbytearray_type T>
+struct from<JSON, T> {
+    template <auto Opts, class It, class End>
+    static void op(auto& value, is_context auto&& ctx, It&& it, End&& end)
+    {
+        std::string str{};
+        read<Opts.format>::template op<Opts>(str, ctx, it, end);
+        value = QByteArray::fromStdString(str);
+    }
+};
+*/
 
 /*
 template <class T>

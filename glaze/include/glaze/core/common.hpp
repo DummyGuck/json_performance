@@ -11,6 +11,8 @@
 #include <type_traits>
 #include <vector>
 
+#include <QByteArray>
+
 #include "glaze/concepts/container_concepts.hpp"
 #include "glaze/core/context.hpp"
 #include "glaze/core/feature_test.hpp"
@@ -236,13 +238,13 @@ namespace glz
 
       template <class T>
       concept str_t =
-         (!std::same_as<std::nullptr_t, T> && std::constructible_from<std::string_view, std::decay_t<T>>) ||
-         array_char_t<T>;
+        !std::same_as<T, QByteArray> && ((!std::same_as<std::nullptr_t, T> && std::constructible_from<std::string_view, std::decay_t<T>>) ||
+                                                       array_char_t<T>);
 
       // this concept requires that T is a writeable string. It can be resized, appended to, or assigned to
       template <class T>
       concept string_t =
-         str_t<T> && !string_view_t<T> && (has_assign<T> || (resizable<T> && has_data<T>) || has_append<T>);
+          str_t<T> && !string_view_t<T> && (has_assign<T> || (resizable<T> && has_data<T>) || has_append<T>);
 
       template <class T>
       concept char_array_t = str_t<T> && std::is_array_v<std::remove_pointer_t<std::remove_reference_t<T>>>;

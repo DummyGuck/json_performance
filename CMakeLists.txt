@@ -15,6 +15,8 @@ add_executable(json_performance
   src/main.cpp
   glaze/include/glaze/api/qt/qvariant.hpp
   glaze/include/glaze/util/wdump.hpp
+  src/test.h
+
 )
 
 include(GNUInstallDirs)
